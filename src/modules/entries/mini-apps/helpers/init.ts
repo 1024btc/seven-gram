@@ -25,7 +25,16 @@ function createCallbacksQueue() {
   }
 
   function addCallback<GCallbackReturnType>(keyCallback: AnyFn, callback: (...args: any[]) => GCallbackReturnType) {
-    const { promise, resolve, reject } = Promise.withResolvers<Awaited<GCallbackReturnType>>()
+    function withResolvers<T>() {
+      let resolve: (value: T | PromiseLike<T>) => void
+      let reject: (reason?: any) => void
+      const promise = new Promise<T>((res, rej) => {
+        resolve = res
+        reject = rej
+      })
+      return { promise, resolve: resolve!, reject: reject! }
+    }
+    const { promise, resolve, reject } = withResolvers<Awaited<GCallbackReturnType>>()
 
     callbacksQueueEntries.unshift([
       keyCallback,
@@ -78,6 +87,28 @@ export async function initMiniApps() {
               })
               configDatabase.updateSessionLoginHeaders(userBotId, axiosClient.defaults.headers, miniApp.login.lifetime)
             }
+            // axiosClient.interceptors.response.use((response: AxiosResponse) => {
+            //   // 2xx status
+            //   return response
+            // }, (error) => {
+            //   if (error.response) {
+            //     const { status, data } = error.response
+            //     if (status >= 400 && status < 500) {
+            //       return Promise.resolve({
+            //         status,
+            //         message: data,
+            //       })
+            //     }
+            //     else if (status === 500) {
+            //       console.error('Internal Server Error!')
+            //     }
+            //   }
+            //   else {
+            //     console.error('No response received:', error)
+            //   }
+            //
+            //   return Promise.reject(error)
+            // })
 
             return axiosClient
           }
