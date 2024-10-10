@@ -1,12 +1,12 @@
-import { Telegraf } from 'telegraf'
-import type { SendMessageParams } from 'telegram/client/messages.js'
 import type { UserFromGetMe } from 'telegraf/types'
+import type { SendMessageParams } from 'telegram/client/messages.js'
 import { faker } from '@faker-js/faker'
-import { AppMeta } from 'src/meta.js'
 import { memoize } from 'lodash-es'
 import { useConfigDatabase } from 'src/config-database.js'
-import { sleep } from 'src/shared.js'
 import { systemLogger } from 'src/logger.js'
+import { AppMeta } from 'src/meta.js'
+import { sleep } from 'src/shared.js'
+import { Telegraf } from 'telegraf'
 import { TelegramMeta } from '../meta.js'
 import { useUserBot } from '../user-bot/use-user-bot.js'
 
@@ -21,7 +21,7 @@ async function createBot() {
   await sendMessageToBotFather({ message: name })
 
   await userBot.waitForIncommingMessage({ fromUsers: [TelegramMeta.botFatherId] })
-  const username = `seven_gram_${faker.string.nanoid(5)}_bot`
+  const username = `seven_gram_${faker.string.alphanumeric(5)}_bot`
   await sleep(2000)
   await sendMessageToBotFather({ message: username })
   const messageEvent = await userBot.waitForIncommingMessage({ fromUsers: [TelegramMeta.botFatherId] })

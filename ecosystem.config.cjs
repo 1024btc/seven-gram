@@ -7,6 +7,10 @@ module.exports = {
     node_args: [
       '--max-old-space-size=800',
     ],
+    env: {
+      NODE_NO_WARNINGS: 1,
+      DAEMON_MODE: 1,
+    },
     env_production: {
       NODE_ENV: 'production',
     },

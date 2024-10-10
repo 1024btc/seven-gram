@@ -1,10 +1,10 @@
 import { randomInt } from 'node:crypto'
+import { AxiosError } from 'axios'
 import { convertToMilliseconds, sleep } from 'src/shared.js'
 import { doFloodProtect } from 'src/telegram/helpers/index.js'
-import { AxiosError } from 'axios'
-import { defineMiniApp } from '../../helpers/define.js'
 import { MiniAppName } from '../../enums.js'
 import { createMiniAppConfigDatabase } from '../../helpers/config-database.js'
+import { defineMiniApp } from '../../helpers/define.js'
 import type { SubTaskItem, TaskItem } from './api.js'
 import { BlumApi } from './api.js'
 import { BlumStatic } from './static.js'
@@ -21,7 +21,16 @@ export const blumMiniApp = defineMiniApp({
 
       return axiosClient
     },
-    lifetime: convertToMilliseconds({ hours: 24 }),
+  },
+  async onResponseRejected(error, axiosClient, createAxios) {
+    if (error.response?.status === 401) {
+      const cleanAxiosClient = createAxios({ headers: BlumStatic.DEFAULT_HEADERS })
+      const { authToken } = await BlumApi.getToken(cleanAxiosClient)
+      axiosClient.defaults.headers.common.Authorization = `Bearer ${authToken}`
+    }
+    else {
+      return error
+    }
   },
   callbackEntities: [
     {

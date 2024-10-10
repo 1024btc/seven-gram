@@ -1,5 +1,5 @@
-import { randomInt } from 'node:crypto'
 import type { CronJobParams } from 'cron'
+import { randomInt } from 'node:crypto'
 import { CronTime } from 'cron'
 
 export type AnyFn = (...args: any[]) => any
@@ -38,5 +38,5 @@ export function formatCoins(coins: number) {
 
 export function createCronTimeoutWithDeviation(cronJobParams: CronJobParams['cronTime'], deviation: number) {
   const cronTimeout = new CronTime(cronJobParams).getTimeout()
-  return randomInt(cronTimeout - deviation, cronTimeout + deviation)
+  return randomInt(cronTimeout, cronTimeout + deviation)
 }

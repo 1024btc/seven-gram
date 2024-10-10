@@ -1,5 +1,5 @@
-import { AppMeta } from 'src/meta.js'
 import { useConfig } from 'src/config.js'
+import { AppMeta } from 'src/meta.js'
 import { defineModule } from '../helpers/define.js'
 
 const config = useConfig()

@@ -3,13 +3,11 @@ import type { HamsterTypes } from '../index.js'
 
 interface GetUpgradesForBuyResponse {
   upgradesForBuy: HamsterTypes.UpgradeForBuy[]
-  sections: HamsterTypes.SectionElement[]
-  dailyCombo: HamsterTypes.DailyCombo
 }
 
 export async function getUpgradesForBuy(axiosClient: AxiosInstance): Promise<GetUpgradesForBuyResponse> {
   const response = await axiosClient.post<GetUpgradesForBuyResponse>(
-    'https://api.hamsterkombatgame.io/clicker/upgrades-for-buy',
+    'https://api.hamsterkombatgame.io/interlude/upgrades-for-buy',
     null,
   )
 
@@ -18,13 +16,12 @@ export async function getUpgradesForBuy(axiosClient: AxiosInstance): Promise<Get
 
 interface BuyUpgradeResponse {
   upgradesForBuy: HamsterTypes.UpgradeForBuy[]
-  clickerUser: HamsterTypes.ClickerUser
-  dailyCombo: HamsterTypes.DailyCombo
+  interludeUser: HamsterTypes.InterludeUser
 }
 
 export async function buyUpgrade(axiosClient: AxiosInstance, upgradeId: string): Promise<BuyUpgradeResponse> {
   const response = await axiosClient.post<BuyUpgradeResponse>(
-    'https://api.hamsterkombatgame.io/clicker/buy-upgrade',
+    'https://api.hamsterkombatgame.io/interlude/buy-upgrade',
     {
       upgradeId,
       timestamp: Date.now(),

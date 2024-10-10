@@ -1,8 +1,9 @@
-import { readFileSync } from 'node:fs'
-import { memoize } from 'lodash-es'
 import type { PackageJson } from 'type-fest'
-import { useEnv } from './env.js'
+import { readFileSync } from 'node:fs'
+import process from 'node:process'
+import { memoize } from 'lodash-es'
 import { useConfigDatabase } from './config-database.js'
+import { useEnv } from './env.js'
 
 export const useConfig = memoize(() => {
   const { NODE_ENV } = useEnv()
@@ -18,5 +19,6 @@ export const useConfig = memoize(() => {
     isProduction,
     getComputedCommandPrefix: () => isLocal ? `${database.data.settings.commandPrefix}dev` : database.data.settings.commandPrefix,
     packageJson,
+    isDaemonMode: Boolean(process.env.DAEMON_MODE),
   }
 })

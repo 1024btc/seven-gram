@@ -1,8 +1,8 @@
-import { existsSync, mkdirSync } from 'node:fs'
-import { JSONFileSyncPreset } from 'lowdb/node'
-import { memoize } from 'lodash-es'
 import type { MiniAppName } from '../enums.js'
 import type { CallbackEntityConfigHashOptions, MiniAppConfig, MiniAppConfigDatabase } from '../types.js'
+import { existsSync, mkdirSync } from 'node:fs'
+import { memoize } from 'lodash-es'
+import { JSONFileSyncPreset } from 'lowdb/node'
 
 export function createMiniAppConfigDatabase(name: MiniAppName) {
   return memoize((): MiniAppConfigDatabase => {
@@ -18,11 +18,9 @@ export function createMiniAppConfigDatabase(name: MiniAppName) {
     const updateSessionLoginHeaders: MiniAppConfigDatabase['updateSessionLoginHeaders'] = (
       sessionId,
       headers,
-      lifetime,
     ) => {
       database.data.sessions[sessionId] ??= {}
       database.data.sessions[sessionId].headersWrapper = {
-        expirationDate: new Date(Date.now() + lifetime).toJSON(),
         headers,
       }
       database.write()
