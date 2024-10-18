@@ -20,7 +20,7 @@
     "src"
   ],
   "exclude": [
-    "/databases",
+    "/databases1",
     "/sessions.json",
     "/dist"
   ]

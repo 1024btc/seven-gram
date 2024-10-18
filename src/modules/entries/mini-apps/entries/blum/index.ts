@@ -1,6 +1,5 @@
 import { randomInt } from 'node:crypto'
-import { AxiosError } from 'axios'
-import { convertToMilliseconds, sleep } from 'src/shared.js'
+import { convertToMilliseconds } from 'src/shared.js'
 import { doFloodProtect } from 'src/telegram/helpers/index.js'
 import { MiniAppName } from '../../enums.js'
 import { createMiniAppConfigDatabase } from '../../helpers/config-database.js'
@@ -14,18 +13,16 @@ export const blumMiniApp = defineMiniApp({
   api: BlumApi,
   configDatabase: createMiniAppConfigDatabase(MiniAppName.BLUM),
   login: {
-    async callback(createAxios) {
-      const axiosClient = createAxios({ headers: BlumStatic.DEFAULT_HEADERS })
-      const { authToken } = await BlumApi.getToken(axiosClient)
-      axiosClient.defaults.headers.common.Authorization = `Bearer ${authToken}`
-
-      return axiosClient
+    async callback({ initialAxiosClient, telegramClient }) {
+      initialAxiosClient.defaults.headers.common = BlumStatic.DEFAULT_HEADERS
+      const { authToken } = await BlumApi.getToken(initialAxiosClient, telegramClient)
+      initialAxiosClient.defaults.headers.common.Authorization = `Bearer ${authToken}`
     },
   },
-  async onResponseRejected(error, axiosClient, createAxios) {
+  async onResponseRejected({ error, axiosClient, telegramClient }) {
     if (error.response?.status === 401) {
-      const cleanAxiosClient = createAxios({ headers: BlumStatic.DEFAULT_HEADERS })
-      const { authToken } = await BlumApi.getToken(cleanAxiosClient)
+      axiosClient.defaults.headers.common.Authorization = undefined
+      const { authToken } = await BlumApi.getToken(axiosClient, telegramClient)
       axiosClient.defaults.headers.common.Authorization = `Bearer ${authToken}`
     }
     else {
@@ -135,167 +132,82 @@ export const blumMiniApp = defineMiniApp({
         convertToMilliseconds({ hours: 8, minutes: 5 }),
       ),
     },
-    {
-      name: 'Play Passes',
-      async callback({ logger, api }) {
-        const POINTS_PER_GAME = [200, 230] as const
-        let balance = await api.getBalance()
+    // {
+    //   name: 'Play Passes',
+    //   async callback({ logger, api }) {
+    //     const POINTS_PER_GAME = [200, 230] as const
+    //     let balance = await api.getBalance()
 
-        if (!balance.playPasses) {
-          await logger.info(`There are no play passes. Sleep...`)
-          return
-        }
+    //     if (!balance.playPasses) {
+    //       await logger.info(`There are no play passes. Sleep...`)
+    //       return
+    //     }
 
-        const randomGamesCount = balance.playPasses <= 5
-          ? balance.playPasses
-          : randomInt(
-            5,
-            balance.playPasses < 10 ? balance.playPasses : 10,
-          )
-        await logger.info(`Starting ${randomGamesCount} game sessions`)
+    //     const randomGamesCount = balance.playPasses <= 5
+    //       ? balance.playPasses
+    //       : randomInt(
+    //         5,
+    //         balance.playPasses < 10 ? balance.playPasses : 10,
+    //       )
+    //     await logger.info(`Starting ${randomGamesCount} game sessions`)
 
-        let claimedGamesCount = 0
-        for (let i = 0; i < randomGamesCount; i++) {
-          try {
-            const { gameId } = await api.startGame()
-            const timeToSleep = randomInt(
-              convertToMilliseconds({ seconds: 29 }),
-              convertToMilliseconds({ seconds: 37 }),
-            )
-            const randomPointsCount = randomInt(POINTS_PER_GAME[0], POINTS_PER_GAME[1])
-            await logger.info(
-              `Starting ${gameId} game session...`
-              + `\nSleep time: ${timeToSleep / 1000} seconds`
-              + `\nPoints to farm : ${randomPointsCount}`,
-            )
-            await sleep(timeToSleep)
-            await api.claimGame(gameId, randomPointsCount)
-            balance = await api.getBalance()
-            await logger.success(
-              `Game session ${gameId} done.`
-              + `\nTotal points: ${balance.availableBalance} (+${randomPointsCount})`
-              + `\nPasses left: ${balance.playPasses}`,
-            )
-            await sleep(randomInt(
-              convertToMilliseconds({ seconds: 10 }),
-              convertToMilliseconds({ seconds: 20 }),
-            ))
-            claimedGamesCount++
-          }
-          catch (error) {
-            if (i === randomGamesCount - 1 && claimedGamesCount === 0) {
-              throw (error)
-            }
+    //     let claimedGamesCount = 0
+    //     for (let i = 0; i < randomGamesCount; i++) {
+    //       try {
+    //         const { gameId } = await api.startGame()
+    //         const timeToSleep = randomInt(
+    //           convertToMilliseconds({ seconds: 29 }),
+    //           convertToMilliseconds({ seconds: 37 }),
+    //         )
+    //         const randomPointsCount = randomInt(POINTS_PER_GAME[0], POINTS_PER_GAME[1])
+    //         await logger.info(
+    //           `Starting ${gameId} game session...`
+    //           + `\nSleep time: ${timeToSleep / 1000} seconds`
+    //           + `\nPoints to farm : ${randomPointsCount}`,
+    //         )
+    //         await sleep(timeToSleep)
+    //         await api.claimGame(gameId, randomPointsCount)
+    //         balance = await api.getBalance()
+    //         await logger.success(
+    //           `Game session ${gameId} done.`
+    //           + `\nTotal points: ${balance.availableBalance} (+${randomPointsCount})`
+    //           + `\nPasses left: ${balance.playPasses}`,
+    //         )
+    //         await sleep(randomInt(
+    //           convertToMilliseconds({ seconds: 10 }),
+    //           convertToMilliseconds({ seconds: 20 }),
+    //         ))
+    //         claimedGamesCount++
+    //       }
+    //       catch (error) {
+    //         if (i === randomGamesCount - 1 && claimedGamesCount === 0) {
+    //           throw (error)
+    //         }
 
-            if (error instanceof AxiosError) {
-              await logger.error(
-                `An error occurs while executing game iteration with index ${i + 1}`
-                + `\n\`\`\`Message: ${error.message}\`\`\``
-                + `\nSkipping game...`,
-              )
-              await sleep(convertToMilliseconds({ seconds: 15 }))
-            }
-          }
-        }
+    //         if (error instanceof AxiosError) {
+    //           console.error(error)
 
-        if (balance.playPasses) {
-          return {
-            extraRestartTimeout: randomInt(
-              convertToMilliseconds({ minutes: 25 }),
-              convertToMilliseconds({ minutes: 35 }),
-            ),
-          }
-        }
-      },
-      timeout: ({ createCronTimeoutWithDeviation }) =>
-        createCronTimeoutWithDeviation('0 11 * * *', convertToMilliseconds({ minutes: 30 })),
-    },
-    {
-      name: 'run tasks',
-      async callback({ logger, api }) {
-        const tasks = await api.getTasks()
-        const taskList = []
-        for (const item of tasks) {
-          if (item.tasks.length) {
-            for (const task of item.tasks) {
-              if (task.subTasks?.length) {
-                taskList.push(...task.subTasks)
-              }
-              else {
-                taskList.push(task)
-              }
-            }
-          }
-          if (item.subSections?.length) {
-            for (const subSelection of item.subSections) {
-              taskList.push(...subSelection.tasks)
-            }
-          }
-        }
-        const doTask = async (task: TaskItem | SubTaskItem) => {
-          // eslint-disable-next-line no-async-promise-executor
-          return new Promise<void>(async (resolve) => {
-            const { id: task_id, type: task_type, title: task_title, validationType: validation_type } = task
-            let task_status = task.status
-            while (true) {
-              if (task_status === 'FINISHED') {
-                console.log(`${task_id} has completed`)
-                return resolve()
-              }
-              if (task_status === 'READY_FOR_CLAIM' || task_status === 'STARTED') {
-                try {
-                  const { message, status } = await api.claimTaskReward(task_id)
-                  if (message)
-                    return resolve()
-                  if (status === 'FINISHED') {
-                    await logger.success(`success complete task ${task_type}[${task_id}] !`)
-                  }
-                }
-                catch (error) {
-                  // eslint-disable-next-line ts/ban-ts-comment
-                  // @ts-expect-error
-                  logger.info(`task ${task_title}[${task_id}] claim error: ${error.response.data.message}`)
-                }
-                return resolve()
-              }
-              if (task_status === 'NOT_STARTED' || task_type === 'PROGRESS_TARGET') {
-                return resolve()
-              }
-              if (task_status === 'NOT_STARTED') {
-                const { message, status } = await api.startTask(task_id)
-                await sleep(randomInt(
-                  convertToMilliseconds({ seconds: 3 }),
-                  convertToMilliseconds({ seconds: 5 }),
-                ))
-                if (message)
-                  return resolve()
-                task_status = status
-                continue
-              }
-              if (validation_type === 'KEYWORD' || task_status === 'READY_FOR_VERIFY') {
-                const answers = await api.getAnswer() as { [key: string]: any }
-                const answer = answers[task_id]
-                if (!answer) {
-                  await logger.info(`answers to quiz tasks are not yet available.`)
-                  return resolve()
-                }
-                const { message, status } = await api.validateTask(task_id, { keyword: answer })
-                if (message)
-                  return resolve()
-                task_status = status
-                continue
-              }
-              await logger.error(`unknown type or status of task [ ${validation_type} or ${task_status} ]`)
-              return resolve()
-            }
-          })
-        }
-        for (const task of taskList) {
-          await doTask(task)
-        }
-      },
-      timeout: ({ createCronTimeoutWithDeviation }) =>
-        createCronTimeoutWithDeviation('0 11 * * *', convertToMilliseconds({ minutes: 30 })),
-    },
+    //           await logger.error(
+    //             `An error occurs while executing game iteration with index ${i + 1}`
+    //             + `\n\`\`\`Message: ${error.message}\`\`\``
+    //             + `\nSkipping game...`,
+    //           )
+    //           await sleep(convertToMilliseconds({ seconds: 15 }))
+    //         }
+    //       }
+    //     }
+
+    //     if (balance.playPasses) {
+    //       return {
+    //         extraRestartTimeout: randomInt(
+    //           convertToMilliseconds({ minutes: 25 }),
+    //           convertToMilliseconds({ minutes: 35 }),
+    //         ),
+    //       }
+    //     }
+    //   },
+    //   timeout: ({ createCronTimeoutWithDeviation }) =>
+    //     createCronTimeoutWithDeviation('0 11 * * *', convertToMilliseconds({ minutes: 30 })),
+    // },
   ],
 })

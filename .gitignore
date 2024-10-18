@@ -1,6 +1,6 @@
 .env
 node_modules
 /dist
-/databases
+/databases1
 /sessions.json
 .idea
