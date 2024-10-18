@@ -1,10 +1,11 @@
+import type { SubTaskItem, TaskItem } from './api.js'
 import { randomInt } from 'node:crypto'
-import { convertToMilliseconds } from 'src/shared.js'
+import { AxiosError } from 'axios'
+import { convertToMilliseconds, sleep } from 'src/shared.js'
 import { doFloodProtect } from 'src/telegram/helpers/index.js'
 import { MiniAppName } from '../../enums.js'
 import { createMiniAppConfigDatabase } from '../../helpers/config-database.js'
 import { defineMiniApp } from '../../helpers/define.js'
-import type { SubTaskItem, TaskItem } from './api.js'
 import { BlumApi } from './api.js'
 import { BlumStatic } from './static.js'
 
@@ -209,5 +210,92 @@ export const blumMiniApp = defineMiniApp({
     //   timeout: ({ createCronTimeoutWithDeviation }) =>
     //     createCronTimeoutWithDeviation('0 11 * * *', convertToMilliseconds({ minutes: 30 })),
     // },
+    {
+      name: 'run tasks',
+      async callback({ logger, api }) {
+        const tasks = await api.getTasks()
+        const taskList = []
+        for (const item of tasks) {
+          if (item.tasks.length) {
+            for (const task of item.tasks) {
+              if (task.subTasks?.length) {
+                taskList.push(...task.subTasks)
+              }
+              else {
+                taskList.push(task)
+              }
+            }
+          }
+          if (item.subSections?.length) {
+            for (const subSelection of item.subSections) {
+              taskList.push(...subSelection.tasks)
+            }
+          }
+        }
+        const doTask = async (task: TaskItem | SubTaskItem) => {
+          // eslint-disable-next-line no-async-promise-executor
+          return new Promise<void>(async (resolve) => {
+            const { id: task_id, type: task_type, title: task_title, validationType: validation_type } = task
+            let task_status = task.status
+            while (true) {
+              if (task_status === 'FINISHED') {
+                console.log(`${task_id} has completed`)
+                return resolve()
+              }
+              if (task_status === 'READY_FOR_CLAIM' || task_status === 'STARTED') {
+                try {
+                  const { message, status } = await api.claimTaskReward(task_id)
+                  if (message)
+                    return resolve()
+                  if (status === 'FINISHED') {
+                    await logger.success(`success complete task ${task_type}[${task_id}] !`)
+                  }
+                }
+                catch (error) {
+                  // eslint-disable-next-line ts/ban-ts-comment
+                  // @ts-expect-error
+                  logger.info(`task ${task_title}[${task_id}] claim error: ${error.response.data.message}`)
+                }
+                return resolve()
+              }
+              if (task_status === 'NOT_STARTED' || task_type === 'PROGRESS_TARGET') {
+                return resolve()
+              }
+              if (task_status === 'NOT_STARTED') {
+                const { message, status } = await api.startTask(task_id)
+                await sleep(randomInt(
+                  convertToMilliseconds({ seconds: 3 }),
+                  convertToMilliseconds({ seconds: 5 }),
+                ))
+                if (message)
+                  return resolve()
+                task_status = status
+                continue
+              }
+              if (validation_type === 'KEYWORD' || task_status === 'READY_FOR_VERIFY') {
+                const answers = await api.getAnswer() as { [key: string]: any }
+                const answer = answers[task_id]
+                if (!answer) {
+                  await logger.info(`answers to quiz tasks are not yet available.`)
+                  return resolve()
+                }
+                const { message, status } = await api.validateTask(task_id, { keyword: answer })
+                if (message)
+                  return resolve()
+                task_status = status
+                continue
+              }
+              await logger.error(`unknown type or status of task [ ${validation_type} or ${task_status} ]`)
+              return resolve()
+            }
+          })
+        }
+        for (const task of taskList) {
+          await doTask(task)
+        }
+      },
+      timeout: ({ createCronTimeoutWithDeviation }) =>
+        createCronTimeoutWithDeviation('0 11 * * *', convertToMilliseconds({ minutes: 30 })),
+    },
   ],
 })
